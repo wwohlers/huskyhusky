@@ -43,15 +43,7 @@ const userSchema = mongoose.Schema({
   },
 
   //admin: true if admin.
-  level: {
-    type: Number
-  },
-
-  //portfolios: array of portfolio ids owned by the user.
-  portfolios: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Portfolio'
-  }],
+  admin: Boolean,
 
   //tokens: array of active authentication tokens.
   tokens: [{

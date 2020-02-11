@@ -1,11 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const User = require('../models/User');
-const Stock = require('../models/Stock');
-const Portfolio = require('../models/Portfolio');
-const Re = require('../models/Article');
+const Article = require('../models/Article');
 const auth = require('../middleware/auth');
-const optauth = require('../middleware/optauth');
 const validator = require('validator')
 
 const router = express.Router();
@@ -16,15 +13,12 @@ const router = express.Router();
 // Gives the logged in user info and their generated token
 router.post('/users', async (req, res) => {
   try {
-    req.body.tokens = [];
-    req.body.portfolios = [];
-    req.body.following = [];
-    req.body.rebuys = [];
-    req.body.strategies = [];
-    req.body.admin = false;
     const user = new User(req.body);
     user.admin = false;
+    user.created_at = Date.now();
+    user.tokens = [];
     await user.save();
+
     const token = await user.generateAuthToken();
     res.status(200).send({ user, token });
   } catch (error) {
@@ -36,7 +30,7 @@ router.post('/users', async (req, res) => {
 // Gets a list of all users
 router.get('/users', async(req, res) => {
   try {
-    const users = await User.find({}, 'id name email');
+    const users = await User.find({}, 'id name bio created_at admin');
     if (!users) {
       res.status(500).send("No users found");
       return;
@@ -49,12 +43,6 @@ router.get('/users', async(req, res) => {
 
 // POST users/login
 // Logs in a registered user
-// Takes 
-//  - email: user's email
-//  - password: password attempt
-// Gives
-//  - user: object of user logged in
-//  - token: access token just generated
 router.post('/users/login', async(req, res) => {
   try {
     const { email, password } = req.body;
@@ -63,7 +51,6 @@ router.post('/users/login', async(req, res) => {
       return res.status(500).send("Fatal: no user found matching credentials");
     }
     const token = await user.generateAuthToken();
-    const hour = 1000 * 60 * 60;
     res.status(200).send({ user, token });
   } catch (error) {
     res.status(500).send("Fatal: caught error. Msg: " + error);
@@ -107,18 +94,16 @@ router.post('/users/me/logoutall', auth, async(req, res) => {
 
 // GET users/:id
 // Gets info about the given user.
-// Params 
-//  - id: user id
-// Gives user object
 router.get('/users/:id', async(req, res) => {
 	try {
 		const id = req.params.id;
-		const user = await User.findById(id)
+    const user = await User.findById(id)
+    const { name, bio, created_at, admin } = user;
     if (!user) {
       res.status(400).send("Fatal: user not found");
       return;
     }
-    res.status(200).send(user);
+    res.status(200).send({ name, bio, created_at, admin });
 	} catch (error) {
     res.status(500).send("Fatal: caught error. Msg: " + error);
 	}
@@ -153,39 +138,6 @@ router.put('/users/password', auth, async(req, res) => {
   }
 })
 
-// POST /users/follow/:id
-// Follow/unfollow a portfolio
-router.post('/users/follow/:id', auth, async(req, res) => {
-  try {
-    const pid = req.params.id;
-    const oldLength = req.user.following.length;
-
-    req.user.following = req.user.following.filter(p => {
-      p.toString() != pid.toString();
-    });
-    const removed = (oldLength - req.user.following.length === 1);
-
-    Portfolio.findById(pid, async(err, p) => {
-      if (err || !p) {
-        const errMsg = "Fatal: " + err ? err : "Portfolio not found";
-        res.status(500).send(errMsg);
-        return;
-      }
-      if (removed) {
-        p.followers -= 1;
-      } else {
-        req.user.following.push(mongoose.Types.ObjectId(pid));
-        p.followers += 1;
-      }
-      await req.user.save();
-      await p.save();
-      res.status(200).send(req.user);
-    })
-  } catch (error) {
-    res.status(500).send("Fatal: caught error. Msg: " + error);
-  }
-})
-
 // PUT /users/bio
 // Change user bio
 router.put('/users/bio', auth, async(req, res) => {
@@ -194,52 +146,6 @@ router.put('/users/bio', auth, async(req, res) => {
     req.user.bio = bio;
     await req.user.save();
     res.status(200).send(req.user);
-  } catch (error) {
-    res.status(500).send("Fatal: caught error. Msg: " + error);
-  }
-})
-
-// PUT /users/settings
-// Change user feed settings
-router.put('/users/settings', auth, async(req, res) => {
-  try {
-    const {settings} = req.body;
-    req.user.feedSettings = settings;
-    await req.user.save();
-    res.status(200).send(req.user);
-  } catch (error) {
-    res.status(500).send("Fatal: caught error. Msg: " + error);
-  }
-})
-
-// POST /users/re/:id
-// Toggles a re by id
-router.post('/users/re/:id', auth, async(req, res) => {
-  try {
-    const reid = req.params.id;
-    const oldLength = req.user.rebuys.length;
-
-    req.user.rebuys = req.user.rebuys.filter(re => re.toString() != reid.toString());
-    const removed = (oldLength - req.user.rebuys.length === 1);
-
-    // add/subtract to # of buys on re
-    Re.findById(reid, async(err, re) => {
-      if (err || !re) {
-        const errMsg = "Fatal: " + err ? err : "Portfolio not found";
-        res.status(500).send(errMsg);
-        return;
-      }
-      if (!removed) {
-        req.user.rebuys.push(mongoose.Types.ObjectId(reid));
-        re.buys += 1;
-      } else {
-        re.buys -= 1;
-      }
-    
-      await req.user.save();
-      await re.save();
-      res.status(200).send(req.user);
-    })
   } catch (error) {
     res.status(500).send("Fatal: caught error. Msg: " + error);
   }

@@ -29,6 +29,11 @@ const applicationSchema = mongoose.Schema({
   submission: {
     type: String,
     minlength: 100
+  },
+
+  approved: {
+    type: Boolean,
+    default: false
   }
 })
 

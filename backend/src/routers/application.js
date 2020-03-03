@@ -14,6 +14,7 @@ router.post('/applications/', async(req, res) => {
   try {
     const app = new Application(req.body);
     app.approved = false;
+    app.created_at = Date.now();
     await app.save();
     res.status(200).send({app});
   } catch (error) {
@@ -26,7 +27,7 @@ router.post('/applications/', async(req, res) => {
 router.get('/applications/', adminauth, async(req, res) => {
   try {
     const apps = await Application.find({});
-    res.status(200).send({app});
+    res.status(200).send({apps});
   } catch (error) {
     res.status(500).send("Fatal: caught error. Msg: " + error);
   }
@@ -46,7 +47,7 @@ router.get('/applications/:id', adminauth, async(req, res) => {
 
 // PUT /applications/:id
 // Set approval of application
-router.get('/applications/:id', adminauth, async(req, res) => {
+router.put('/applications/:id', adminauth, async(req, res) => {
   try {
     const {id} = req.params;
     const app = await Application.findById(id);

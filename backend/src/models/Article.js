@@ -33,7 +33,7 @@ const articleSchema = mongoose.Schema({
   },
 
   // genre: genre of the article.
-  genre: {
+  category: {
     type: String,
     minlength: 3,
     maxlength: 20

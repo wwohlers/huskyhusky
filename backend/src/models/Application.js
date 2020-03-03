@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+const validator = require('validator')
 
 const applicationSchema = mongoose.Schema({
   //name: full name of user.
@@ -37,6 +38,6 @@ const applicationSchema = mongoose.Schema({
   }
 })
 
-const Application = mongoose.model('Article', applicationSchema)
+const Application = mongoose.model('Application', applicationSchema)
 
 module.exports = Application;

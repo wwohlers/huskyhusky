@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Article = require('../models/Article');
 const adminauth = require('../middleware/adminauth');
 const auth = require('../middleware/auth');
+const optauth = require('../middleware/optauth');
 
 const router = express.Router();
 
@@ -12,7 +13,7 @@ const router = express.Router();
 router.post('/articles/', auth, async(req, res) => {
   try {
     const article = new Article(req.body);
-    article.author = mongoose.Schema.Types.ObjectId(req.user.id);
+    article.author = mongoose.Types.ObjectId(req.user.id);
     article.created_at = Date.now();
     article.public = false;
     await article.save();
@@ -22,26 +23,78 @@ router.post('/articles/', auth, async(req, res) => {
   }
 })
 
-// GET /articles/:id
+// GET /articles
+// Get a list of basic info about all articles
+router.get('/articles', async(req, res) => {
+  try {
+    const articles = await Article.find({});
+    res.status(201).send({ articles });
+  } catch (error) {
+    res.status(500).send("Fatal: caught error. Msg: " + error);
+  }
+})
+
+// GET /top
+// Get most recent 20 published articles
+router.get('/top', async(req, res) => {
+  try {
+    const articles = await Article.find({public: true}).sort({'created_at': -1}).limit(20);
+    res.status(201).send({ articles });
+  } catch (error) {
+    res.status(500).send("Fatal: caught error. Msg: " + error);
+  }
+})
+
+// GET /articles/id/:id
 // Get an article
-router.get('/articles/:id', async(req, res) => {
+router.get('/articles/id/:id', optauth, async(req, res) => {
   try {
     const {id} = req.params;
     const article = await Article.findById(id);
+    if (article.public == false) {
+      if (!req.user || (req.user.id.toString() != article.author.toString() && !req.user.admin)) {
+        throw new Error("Unauthorized");
+      }
+    }
     res.status(201).send({ article });
   } catch (error) {
     res.status(500).send("Fatal: caught error. Msg: " + error);
   }
 })
 
+// GET /articles/:name
+// Get an article by name
+router.get('/articles/:name', optauth, async(req, res) => {
+  try {
+    const {name} = req.params;
+    const article = await Article.findOne({name: name});
+    if (article.public == false) {
+      if (!req.user || (req.user.id.toString() != article.author.toString() && !req.user.admin)) {
+        res.status(500).send("Unauthorized");
+      }
+    }
+    res.status(201).send({ article });
+  } catch (error) {
+    res.status(500).send("Fatal: caught error. Msg: " + error);
+  }
+})
+
+
 // PUT /articles/:id
 // Update an article
 router.put('/articles/:id', auth, async(req, res) => {
   try {
     const {id} = req.params;
-    const article = new Article(req.body);
-    if (article.author.toString() != req.user.id.toString()) {
+    const newArticle = req.body;
+    const article = await Article.findById(id);
+    if (article.author.toString() != req.user.id.toString() && !req.user.admin) {
       throw new Error("Unauthorized");
+    }
+    const valid = ['public', 'name', 'title', 'category', 'brief', 'image', 'text'];
+    for (var key in newArticle) {
+      if (valid.includes(key)) {
+        article[key] = newArticle[key];
+      }
     }
     if (!req.user.admin) {
       article.public = false;

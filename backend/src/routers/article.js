@@ -19,6 +19,7 @@ router.post('/articles/', auth, async(req, res) => {
     await article.save();
     res.status(201).send({ article });
   } catch (error) {
+    console.log(error);
     res.status(500).send("Fatal: caught error. Msg: " + error);
   }
 })
@@ -45,9 +46,57 @@ router.get('/top', async(req, res) => {
   }
 })
 
-// GET /articles/id/:id
+// POST /filter
+// Get articles filtered by month
+router.post('/filter', async(req, res) => {
+  try {
+    var {month, year} = req.body;
+    month += 1; // changes from zero based month to 1-12
+    const monthStr = (month < 10) ? "0" + month.toString() : month.toString();
+    const gte = year.toString() + "-" + monthStr + "-01T00:00:00.000Z";
+    var lt;
+    if (month == 12) {
+      lt = (year + 1).toString() + "-01-01T00:00:00.000Z";
+    } else {
+      const nextMonth = month + 1;
+      const nextMonthStr = (nextMonth < 10) ? "0" + nextMonth.toString() : nextMonth.toString();
+      lt = year.toString() + "-" + nextMonthStr + "-01T00:00:00.000Z";
+    }
+    const articles = await Article.find({
+      created_at: {
+        $gte: new Date(gte),
+        $lt: new Date(lt)
+      }
+    });
+    res.status(201).send({ articles });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("Fatal: caught error. Msg: " + error);
+  }
+})
+
+// POST /search
+// Search articles with query
+router.post('/search', async(req, res) => {
+  try {
+    const {query} = req.body;
+    const articles = await Article
+    .find(
+        { $text : { $search : query } }, 
+        { score : { $meta: "textScore" } },
+        { public: true }
+    )
+    .sort({ score : { $meta : 'textScore' } });
+    res.status(201).send({ articles });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("Fatal: caught error. Msg: " + error);
+  }
+})
+
+// GET /articlebyid/:id
 // Get an article
-router.get('/articles/id/:id', optauth, async(req, res) => {
+router.get('/articlebyid/:id', optauth, async(req, res) => {
   try {
     const {id} = req.params;
     const article = await Article.findById(id);
@@ -90,7 +139,7 @@ router.put('/articles/:id', auth, async(req, res) => {
     if (article.author.toString() != req.user.id.toString() && !req.user.admin) {
       throw new Error("Unauthorized");
     }
-    const valid = ['public', 'name', 'title', 'category', 'brief', 'image', 'text'];
+    const valid = ['public', 'name', 'title', 'category', 'brief', 'image', 'text', 'requested'];
     for (var key in newArticle) {
       if (valid.includes(key)) {
         article[key] = newArticle[key];

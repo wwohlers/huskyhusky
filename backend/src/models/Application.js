@@ -6,8 +6,7 @@ const applicationSchema = mongoose.Schema({
   name: {
     type: String,
     required: true,
-    trim: true,
-    unique: true
+    trim: true
   },
 
   //email: unique email of user.
@@ -28,8 +27,7 @@ const applicationSchema = mongoose.Schema({
   },
   
   submission: {
-    type: String,
-    minlength: 100
+    type: String
   },
 
   approved: {
